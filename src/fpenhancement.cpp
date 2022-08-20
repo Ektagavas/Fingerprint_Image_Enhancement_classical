@@ -263,12 +263,6 @@ float FPEnhancement::deviation(const cv::Mat &im, float average) {
     return sd;
 }
 
-/*
- * Compute a filter which remove the background based on a input image.
- *
- * The filter is a simple mask which keep only pixed corresponding
- * to the fingerprint.
- */
 cv::Mat FPEnhancement::postProcessingFilter(const cv::Mat &inputImage) const {
     cv::Mat inputImageGrey;
     cv::Mat filter;
@@ -279,33 +273,110 @@ cv::Mat FPEnhancement::postProcessingFilter(const cv::Mat &inputImage) const {
         inputImageGrey = inputImage.clone();
     }
 
-    // Blurring the image several times with a kernel 3x3
-    // to have smooth surfaces
-    for (int j = 0; j < blurringTimes; j++) {
-        blur(inputImageGrey, inputImageGrey, cv::Size(3, 3));
-    }
+    cv::Mat grad_x, grad_y;
+    Sobel(inputImageGrey, grad_x, CV_32FC1, 1, 0);
+    Sobel(inputImageGrey, grad_y, CV_32FC1, 0, 1);
 
-    // Canny detector to catch the edges
-    Canny(inputImageGrey, filter, cannyLowThreshold,
-          cannyLowThreshold * cannyRatio, kernelSize);
+    // cv::FileStorage file1("gx.xml", cv::FileStorage::WRITE);
+    // file1 << "matName" << grad_x;
+    // cv::FileStorage file2("gy.xml", cv::FileStorage::WRITE);
+    // file2 << "matName" << grad_y;
+    
+    cv::Mat gx2, gy2;
+    cv::multiply(grad_x, grad_x, gx2);
+    cv::multiply(grad_y, grad_y, gy2);
 
-    // Use Canny's output as a mask
-    cv::Mat processedImage(cv::Scalar::all(0));
-    inputImageGrey.copyTo(processedImage, filter);
+    cv::Mat gm, sum_gm, G;
+    G = gx2 + gy2;
+    cv::sqrt(G, G);
 
-    cv::Mat element = cv::getStructuringElement(
-            dilationType, cv::Size(2 * dilationSize + 1, 2 * dilationSize + 1),
-            cv::Point(dilationSize, dilationSize));
+    // cv::FileStorage file1("gx2.xml", cv::FileStorage::WRITE);
+    // file1 << "matName" << gx2;
+    // cv::FileStorage file2("gy2.xml", cv::FileStorage::WRITE);
+    // file2 << "matName" << gy2;
+    // cv::FileStorage file3("gm.xml", cv::FileStorage::WRITE);
+    // file3 << "matName" << G;
 
-    // Dilate the image to get the contour of the finger
-    dilate(processedImage, processedImage, element);
+    cv::boxFilter(G, sum_gm, -1, cv::Size(25, 25), cv::Point(-1,-1), false);
+    // cv::FileStorage file1("sum_gm.xml", cv::FileStorage::WRITE);
+    // file1 << "matName" << sum_gm;
 
-    // Fill the image from the middle to the edge.
-    floodFill(processedImage, cv::Point(filter.cols / 2, filter.rows / 2),
-              cv::Scalar(255));
+    double min, max;
+    cv::minMaxLoc(sum_gm, &min, &max);
 
-    return processedImage;
+    float thr;
+    thr = max * 0.2;
+
+    cv::Mat processedImage, final_filter; //(cv::Scalar::all(0));
+    cv::threshold(sum_gm,processedImage, thr, 255, cv::THRESH_BINARY);
+    // inputImageGrey.copyTo(processedImage, filter);
+    processedImage.convertTo(final_filter,CV_8U);
+    // cv::FileStorage file("proc.xml", cv::FileStorage::WRITE);
+    // file << "matName" << final_filter;
+    return final_filter;
 }
+
+/*
+ * Compute a filter which remove the background based on a input image.
+ *
+ * The filter is a simple mask which keep only pixed corresponding
+ * to the fingerprint.
+ */
+// cv::Mat FPEnhancement::postProcessingFilter(const cv::Mat &inputImage) const {
+//     cv::Mat inputImageGrey;
+//     cv::Mat filter;
+
+//     if (inputImage.channels() != 1) {
+//         cvtColor(inputImage, inputImageGrey, CV_RGB2GRAY);
+//     } else {
+//         inputImageGrey = inputImage.clone();
+//     }
+
+//     // Blurring the image several times with a kernel 3x3
+//     // to have smooth surfaces
+//     for (int j = 0; j < 50; j++) {
+//         blur(inputImageGrey, inputImageGrey, cv::Size(3, 3));
+//     }
+
+//     // Canny detector to catch the edges
+//     Canny(inputImageGrey, filter, cannyLowThreshold,
+//           cannyLowThreshold * cannyRatio, kernelSize);
+
+//     // Use Canny's output as a mask
+//     cv::Mat processedImage(cv::Scalar::all(0));
+//     cv::bitwise_and(inputImageGrey, inputImageGrey, processedImage, filter);
+//     // inputImageGrey.copyTo(processedImage, filter);
+
+//     // cv::FileStorage file("filter.xml", cv::FileStorage::WRITE);
+//     // file << "matName" << filter;
+//     // cv::FileStorage file("proc.xml", cv::FileStorage::WRITE);
+//     // file << "matName" << processedImage;
+    
+    
+
+//     cv::Mat element = cv::getStructuringElement(
+//             dilationType, cv::Size(2 * dilationSize + 1, 2 * dilationSize + 1),
+//             cv::Point(dilationSize, dilationSize));
+
+//     // Dilate the image to get the contour of the finger
+//     dilate(processedImage, processedImage, element);
+//     cv::Mat mask = (processedImage != 0);
+//     cv::Mat m2 = cv::Mat(processedImage.rows,processedImage.cols, CV_8U, cv::Scalar(255));
+//     m2.copyTo(m2, mask);
+//     cv::FileStorage file1("m2.xml", cv::FileStorage::WRITE);
+//     file1 << "matName" << mask;
+//     // cv::FileStorage file2("element.xml", cv::FileStorage::WRITE);
+//     // file2 << "matName" << element;
+//     cv::Mat m1 = cv::Mat(processedImage.rows+2,processedImage.cols+2, CV_8U, cv::Scalar(0));
+//     // Fill the image from the middle to the edge.
+//     floodFill(m2, m1, cv::Point(filter.cols / 2, filter.rows / 2),
+//               cv::Scalar(255));
+//     cv::FileStorage file2("proc1.xml", cv::FileStorage::WRITE);
+//     file2 << "matName" << m2;
+//     return m2;
+// }
+
+
 
 /*
  * This is equivalent to Matlab's 'meshgrid' function
@@ -338,13 +409,17 @@ cv::Mat FPEnhancement::filter_ridge(const cv::Mat &inputImage,
     // Fixed angle increment between filter orientations in degrees
     int angleInc = 3;
 
+    // cv::imwrite( "freq.png",frequency);
+    // cv::FileStorage file("freq.xml", cv::FileStorage::WRITE);
+    // file << "matName" << frequency;
+
     inputImage.convertTo(inputImage, CV_32FC1);
     int rows = inputImage.rows;
     int cols = inputImage.cols;
 
     orientationImage.convertTo(orientationImage, CV_32FC1);
 
-    cv::Mat enhancedImage = cv::Mat::zeros(rows, cols, CV_32FC1);
+    cv::Mat enhancedImage = cv::Mat(rows, cols, CV_32FC1, cv::Scalar(255));
     cv::vector<int> validr;
     cv::vector<int> validc;
 
@@ -362,7 +437,7 @@ cv::Mat FPEnhancement::filter_ridge(const cv::Mat &inputImage,
     cv::Mat meshX, meshY;
     meshgrid(szek, meshX, meshY);
 
-    cv::Mat refFilter = cv::Mat::zeros(meshX.rows, meshX.cols, CV_32FC1);
+    cv::Mat refFilter = cv::Mat(meshX.rows, meshX.cols, CV_32FC1, cv::Scalar(0));
 
     meshX.convertTo(meshX, CV_32FC1);
     meshY.convertTo(meshY, CV_32FC1);
@@ -443,8 +518,8 @@ cv::Mat FPEnhancement::filter_ridge(const cv::Mat &inputImage,
         cv::Mat mulResult;
         cv::multiply(subim, subFilter, mulResult);
 
-        if (cv::sum(mulResult)[0] > 0) {
-            enhancedImage.at<float>(r, c) = 255;
+        if (cv::sum(mulResult)[0] <= 0) {
+            enhancedImage.at<float>(r, c) = 0;
         }
     }
 

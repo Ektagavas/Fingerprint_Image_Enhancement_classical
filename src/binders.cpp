@@ -42,8 +42,8 @@ PYBIND11_MODULE(fingerprint, m) {
                       "canny_low_threshold"_a = 10,
                       "canny_ratio"_a = 3,
                       "kernel_size"_a = 3,
-                      "blurring_times"_a = 30,
-                      "dilation_size"_a = 10,
+                      "blurring_times"_a = 50,
+                      "dilation_size"_a = 5,
                       "dilation_type"_a = 1,
                       "verbose"_a = false
                       )

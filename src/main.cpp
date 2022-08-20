@@ -112,6 +112,8 @@ int main(int argc, char *argv[]) {
     ///
 
     cv::Mat input = cv::imread(inputImage);
+    cv::Scalar value(255, 255, 255);
+    cv::copyMakeBorder(input, input, 20, 20, 20, 20, cv::BORDER_CONSTANT, value);
 
     // Make sure the input image is valid
     if (!input.data) {
@@ -142,17 +144,30 @@ int main(int argc, char *argv[]) {
     if (performPostprocessing) {
         // Apply the post processing for better results
         cv::Mat filter = fpEnhancement.postProcessingFilter(input);
+        // cv::imwrite("filter.png", filter);
+        // cv::imwrite("enhanced.png", enhancedImage);
 
-        if (verbose) {
+        /*if (verbose) {
             std::cout << "Type of the image  : " << getImageType(enhancedImage.type())
                       << std::endl;
             std::cout << "Type of the filter : " << getImageType(filter.type())
                       << std::endl;
-        }
+        }*/
 
         enhancedImage.copyTo(endResult, filter);
+        // cv::FileStorage file2("filter.xml", cv::FileStorage::WRITE);
+        // file2 << "matName" << 255-filter;
+        // std::cout << endResult.rows << filter.rows << filter.size[2];
+        // cv::cvtColor(filter, filter, CV_GRAY2RGB);
+        // cv::FileStorage file1("endResult.xml", cv::FileStorage::WRITE);
+        // file1 << "matName" << endResult;
+        // std::cout << endResult.rows << filter.rows << filter.size[2];
+        endResult.convertTo(endResult, CV_8U);
+        cv::bitwise_or(endResult,  255-filter, endResult);
+        endResult = endResult(cv::Range(20,endResult.rows-20), cv::Range(20,endResult.cols-20));
     } else {
         endResult = enhancedImage;
+        endResult = endResult(cv::Range(20,endResult.rows-20), cv::Range(20,endResult.cols-20));
     }
 
     if (showResult) {
